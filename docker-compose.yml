@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  quantum-gan:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      # Mount the output directory to save generated images and model weights
+      - ./output:/app/output
+    environment:
+      - TF_CPP_MIN_LOG_LEVEL=2  # Reduce TensorFlow logging verbosity
+    deploy:
+      resources:
+        limits:
+          memory: 4G  # Adjust based on your model's requirements

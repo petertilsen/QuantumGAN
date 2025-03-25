@@ -1,0 +1,17 @@
+.git
+.venv
+.idea
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+*.so
+.coverage
+.pytest_cache
+.tox
+htmlcov
+.DS_Store
+output/
+*.h5
