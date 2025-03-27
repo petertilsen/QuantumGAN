@@ -4,3 +4,9 @@ tensorflow-quantum>=0.7.0
 qiskit>=0.43.0
 numpy>=1.23.0
 matplotlib>=3.7.0
+
+# Test libraries
+pytest>=7.3.1
+pytest-cov>=4.1.0
+pytest-mock>=3.10.0
+hypothesis>=6.75.0
