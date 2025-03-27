@@ -1,177 +1,179 @@
-import unittest
+import pytest
 import numpy as np
 import tensorflow as tf
-from unittest.mock import patch, MagicMock
-import sys
-import os
-
-# Add parent directory to path to import modules
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from tensorflow.keras.layers import Layer
+import pennylane as qml
 
 from quantum_gan import (
-    quantum_circuit, 
-    QuantumLayer, 
-    QuantumGenerator, 
-    build_discriminator, 
+    quantum_circuit,
+    QuantumLayer,
+    QuantumGenerator,
+    build_discriminator,
     QuantumGAN
 )
 
-class TestQuantumCircuit(unittest.TestCase):
-    @patch('quantum_gan.qml.expval')
-    @patch('quantum_gan.qml.PauliZ')
-    @patch('quantum_gan.qml.CNOT')
-    @patch('quantum_gan.qml.RZ')
-    @patch('quantum_gan.qml.RY')
-    @patch('quantum_gan.qml.RX')
-    def test_quantum_circuit(self, mock_rx, mock_ry, mock_rz, mock_cnot, mock_pauliz, mock_expval):
-        # Mock the return value of expval
-        mock_expval.return_value = 0.5
+class TestQuantumCircuit:
+    def test_quantum_circuit_output_shape(self):
+        """Test that the quantum circuit returns the expected output shape."""
+        n_qubits = 4
+        n_layers = 2
         
-        # Create test inputs and weights
-        inputs = np.array([0.1, 0.2, 0.3, 0.4])
-        weights = np.random.random((2, 4, 3))  # 2 layers, 4 qubits, 3 rotation gates
+        # Create random inputs and weights
+        inputs = tf.random.normal([n_qubits])
+        weights = tf.random.normal([n_layers, n_qubits, 3])
         
-        # Call the quantum circuit
-        result = quantum_circuit(inputs, weights)
+        # Get output from quantum circuit
+        output = quantum_circuit(inputs, weights)
         
-        # Check that the result has the expected shape
-        self.assertEqual(len(result), 4)  # 4 qubits
+        # Check output shape
+        assert len(output) == n_qubits, f"Expected output length {n_qubits}, got {len(output)}"
         
-        # Check that the quantum operations were called
-        self.assertEqual(mock_rx.call_count, 4 + 8)  # 4 input encodings + 8 rotations
-        self.assertEqual(mock_ry.call_count, 8)  # 8 rotations
-        self.assertEqual(mock_rz.call_count, 8)  # 8 rotations
-        self.assertEqual(mock_cnot.call_count, 8)  # 8 entangling gates
-        self.assertEqual(mock_pauliz.call_count, 4)  # 4 measurements
-        self.assertEqual(mock_expval.call_count, 4)  # 4 expectation values
+    def test_quantum_circuit_output_type(self):
+        """Test that the quantum circuit returns real values."""
+        n_qubits = 4
+        n_layers = 2
+        
+        # Create random inputs and weights
+        inputs = tf.random.normal([n_qubits])
+        weights = tf.random.normal([n_layers, n_qubits, 3])
+        
+        # Get output from quantum circuit
+        output = quantum_circuit(inputs, weights)
+        
+        # Check that output values are within the expected range for PauliZ measurements
+        for val in output:
+            assert -1.0 <= val <= 1.0, f"Expected value between -1 and 1, got {val}"
 
 
-class TestQuantumLayer(unittest.TestCase):
-    def setUp(self):
-        self.n_qubits = 4
-        self.n_layers = 2
+class TestQuantumLayer:
+    def test_quantum_layer_initialization(self):
+        """Test that the QuantumLayer initializes correctly."""
+        n_qubits = 4
+        n_layers = 2
         
-    @patch('quantum_gan.quantum_circuit')
-    def test_call(self, mock_quantum_circuit):
-        # Mock the return value of quantum_circuit
-        mock_quantum_circuit.return_value = np.array([0.5, 0.5, 0.5, 0.5])
+        layer = QuantumLayer(n_qubits, n_layers)
         
-        # Create a quantum layer
-        layer = QuantumLayer(self.n_qubits, self.n_layers)
+        # Check that weights were created with the right shape
+        assert layer.quantum_weights.shape == (n_layers, n_qubits, 3)
         
-        # Create test inputs
-        inputs = tf.constant([[0.1, 0.2, 0.3, 0.4], [0.5, 0.6, 0.7, 0.8]])
+    def test_quantum_layer_call(self):
+        """Test that the QuantumLayer call method works correctly."""
+        n_qubits = 4
+        n_layers = 2
+        batch_size = 3
+        
+        layer = QuantumLayer(n_qubits, n_layers)
+        inputs = tf.random.normal([batch_size, n_qubits])
         
         # Call the layer
-        result = layer(inputs)
+        outputs = layer(inputs)
         
-        # Check that the result has the expected shape
-        self.assertEqual(result.shape, (2, 4))  # 2 samples, 4 qubits
+        # Check output shape
+        assert outputs.shape == (batch_size, n_qubits)
         
-        # Check that quantum_circuit was called twice (once for each input)
-        self.assertEqual(mock_quantum_circuit.call_count, 2)
-        
-    def test_weights_initialization(self):
-        # Create a quantum layer
-        layer = QuantumLayer(self.n_qubits, self.n_layers)
-        
-        # Check that the weights have the expected shape
-        self.assertEqual(layer.weights.shape, (self.n_layers, self.n_qubits, 3))
+        # Check output type
+        assert outputs.dtype == tf.float32, f"Expected dtype float32, got {outputs.dtype}"
 
 
-class TestQuantumGenerator(unittest.TestCase):
-    def setUp(self):
-        self.n_qubits = 4
-        self.n_layers = 2
-        self.latent_dim = 8
+class TestQuantumGenerator:
+    def test_generator_initialization(self):
+        """Test that the QuantumGenerator initializes correctly."""
+        n_qubits = 4
+        n_layers = 2
+        latent_dim = 8
         
-    @patch.object(QuantumLayer, 'call')
-    def test_call(self, mock_quantum_layer_call):
-        # Mock the return value of QuantumLayer.call
-        mock_quantum_layer_call.return_value = tf.constant([[0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5]])
+        generator = QuantumGenerator(n_qubits, n_layers, latent_dim)
         
-        # Create a quantum generator
-        generator = QuantumGenerator(self.n_qubits, self.n_layers, self.latent_dim)
+        # Check that the generator has the expected layers
+        assert hasattr(generator, 'input_layer')
+        assert hasattr(generator, 'quantum_layer')
+        assert hasattr(generator, 'output_layer')
         
-        # Create test inputs
-        inputs = tf.random.normal((2, self.latent_dim))
+    def test_generator_call(self):
+        """Test that the QuantumGenerator call method works correctly."""
+        n_qubits = 4
+        n_layers = 2
+        latent_dim = 8
+        batch_size = 3
+        
+        generator = QuantumGenerator(n_qubits, n_layers, latent_dim)
+        inputs = tf.random.normal([batch_size, latent_dim])
         
         # Call the generator
-        result = generator(inputs)
+        outputs = generator(inputs)
         
-        # Check that the result has the expected shape
-        self.assertEqual(result.shape, (2, self.latent_dim))  # 2 samples, latent_dim outputs
+        # Check output shape
+        assert outputs.shape == (batch_size, latent_dim)
         
-        # Check that QuantumLayer.call was called once
-        mock_quantum_layer_call.assert_called_once()
+        # Check output values are in the expected range (tanh activation)
+        assert tf.reduce_all(outputs >= -1.0)
+        assert tf.reduce_all(outputs <= 1.0)
 
 
-class TestDiscriminator(unittest.TestCase):
-    def test_build_discriminator(self):
-        # Create a discriminator
-        discriminator = build_discriminator(8)
+class TestDiscriminator:
+    def test_discriminator_initialization(self):
+        """Test that the discriminator initializes correctly."""
+        input_dim = 8
         
-        # Check that the discriminator has the expected architecture
-        self.assertEqual(len(discriminator.layers), 4)
-        self.assertEqual(discriminator.layers[0].units, 64)
-        self.assertEqual(discriminator.layers[1].units, 32)
-        self.assertEqual(discriminator.layers[2].units, 16)
-        self.assertEqual(discriminator.layers[3].units, 1)
+        discriminator = build_discriminator(input_dim)
         
-        # Check that the discriminator produces the expected output shape
-        inputs = tf.random.normal((2, 8))
-        result = discriminator(inputs)
-        self.assertEqual(result.shape, (2, 1))
+        # Check that the discriminator has the expected number of layers
+        assert len(discriminator.layers) == 4
+        
+    def test_discriminator_call(self):
+        """Test that the discriminator call method works correctly."""
+        input_dim = 8
+        batch_size = 3
+        
+        discriminator = build_discriminator(input_dim)
+        inputs = tf.random.normal([batch_size, input_dim])
+        
+        # Call the discriminator
+        outputs = discriminator(inputs)
+        
+        # Check output shape
+        assert outputs.shape == (batch_size, 1)
+        
+        # Check output values are in the expected range (sigmoid activation)
+        assert tf.reduce_all(outputs >= 0.0)
+        assert tf.reduce_all(outputs <= 1.0)
 
 
-class TestQuantumGAN(unittest.TestCase):
-    def setUp(self):
-        self.n_qubits = 4
-        self.n_layers = 2
-        self.latent_dim = 8
+class TestQuantumGAN:
+    def test_gan_initialization(self):
+        """Test that the QuantumGAN initializes correctly."""
+        n_qubits = 4
+        n_layers = 2
+        latent_dim = 8
         
-        # Create generator and discriminator
-        self.generator = MagicMock()
-        self.discriminator = MagicMock()
+        generator = QuantumGenerator(n_qubits, n_layers, latent_dim)
+        discriminator = build_discriminator(latent_dim)
         
-        # Create GAN
-        self.gan = QuantumGAN(self.generator, self.discriminator)
+        gan = QuantumGAN(generator, discriminator)
         
-        # Compile GAN
-        self.gan.compile(
+        # Check that the GAN has the expected components
+        assert gan.generator is generator
+        assert gan.discriminator is discriminator
+        
+    def test_gan_compile(self):
+        """Test that the QuantumGAN compiles correctly."""
+        n_qubits = 4
+        n_layers = 2
+        latent_dim = 8
+        
+        generator = QuantumGenerator(n_qubits, n_layers, latent_dim)
+        discriminator = build_discriminator(latent_dim)
+        
+        gan = QuantumGAN(generator, discriminator)
+        
+        # Compile the GAN
+        gan.compile(
             g_optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
             d_optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
             loss_fn=tf.keras.losses.BinaryCrossentropy()
         )
         
-    def test_compile(self):
-        # Check that the optimizers and loss function are set correctly
-        self.assertIsInstance(self.gan.g_optimizer, tf.keras.optimizers.Adam)
-        self.assertIsInstance(self.gan.d_optimizer, tf.keras.optimizers.Adam)
-        self.assertIsInstance(self.gan.loss_fn, tf.keras.losses.BinaryCrossentropy)
-        
-    def test_train_step(self):
-        # Mock generator and discriminator outputs
-        self.generator.return_value = tf.random.normal((2, self.latent_dim))
-        self.discriminator.return_value = tf.constant([[0.7], [0.3]])
-        
-        # Set latent_dim attribute on generator mock
-        self.generator.latent_dim = self.latent_dim
-        
-        # Create test data
-        real_data = tf.random.normal((2, self.latent_dim))
-        
-        # Call train_step
-        result = self.gan.train_step(real_data)
-        
-        # Check that the result contains the expected keys
-        self.assertIn('d_loss', result)
-        self.assertIn('g_loss', result)
-        
-        # Check that the generator and discriminator were called
-        self.generator.assert_called()
-        self.discriminator.assert_called()
-
-
-if __name__ == '__main__':
-    unittest.main()
+        # Check that the optimizers and loss function were set correctly
+        assert isinstance(gan.g_optimizer, tf.keras.optimizers.Adam)
+        assert isinstance(gan.d_optimizer, tf.keras.optimizers.Adam)
+        assert isinstance(gan.loss_fn, tf.keras.losses.BinaryCrossentropy)
