@@ -109,9 +109,10 @@ plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.legend()
 plt.title('Training Losses')
-plt.savefig('/app/output/loss_curves.png')
+plt.savefig('./output/loss_curves.png')
 plt.close()
 
 # Save the trained models
-generator.save_weights('/app/output/quantum_generator_weights.h5')
-discriminator.save_weights('/app/output/discriminator_weights.h5')
+generator.save_weights('./output/quantum_generator.weights.h5')
+discriminator.save_weights('./output/discriminator.weights.h5')
+

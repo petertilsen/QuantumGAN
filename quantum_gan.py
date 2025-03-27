@@ -13,6 +13,7 @@ n_layers = 2  # Number of layers
 dev = qml.device("default.qubit", wires=n_qubits)
 
 # Define the quantum circuit for the generator
+# Define the quantum circuit for the generator
 @qml.qnode(dev, interface="tf")
 def quantum_circuit(inputs, weights):
     """
@@ -42,7 +43,7 @@ def quantum_circuit(inputs, weights):
             qml.CNOT(wires=[i, i + 1])
         qml.CNOT(wires=[n_qubits - 1, 0])  # Connect the last qubit to the first
     
-    # Measure the state of each qubit
+    # Return expectation values
     return [qml.expval(qml.PauliZ(i)) for i in range(n_qubits)]
 
 # Define the Keras layer for the quantum circuit
@@ -51,17 +52,26 @@ class QuantumLayer(Layer):
         super(QuantumLayer, self).__init__()
         self.n_qubits = n_qubits
         self.n_layers = n_layers
-        # Initialize weights with small random values
-        weight_shapes = {"weights": (n_layers, n_qubits, 3)}  # 3 rotation gates per qubit
-        self.weights = tf.Variable(
-            0.01 * np.random.randn(n_layers, n_qubits, 3),
-            dtype=tf.float32,
-            trainable=True,
-            name="quantum_weights"
+        # Initialize weights with small random values using add_weight method
+        self.quantum_weights = self.add_weight(
+            name="quantum_weights",
+            shape=(n_layers, n_qubits, 3),  # 3 rotation gates per qubit
+            initializer=tf.keras.initializers.RandomNormal(stddev=0.01),
+            trainable=True
         )
     
     def call(self, inputs):
-        return tf.stack([quantum_circuit(inputs[i], self.weights) for i in range(inputs.shape[0])])
+        # Process each input in the batch
+        outputs = []
+        for i in range(inputs.shape[0]):
+            # Get quantum circuit output for this input
+            result = quantum_circuit(inputs[i], self.quantum_weights)
+            # Extract real part explicitly before appending
+            real_result = tf.math.real(result)
+            outputs.append(real_result)
+        
+        # Stack results and ensure they're float32
+        return tf.cast(tf.stack(outputs), dtype=tf.float32)
 
 # Define the Quantum Generator
 class QuantumGenerator(tf.keras.Model):
