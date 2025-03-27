@@ -126,7 +126,7 @@ class TestModelSaving(unittest.TestCase):
         plt.ylabel('Loss')
         plt.legend()
         plt.title('Training Losses')
-        plt.savefig('/app/output/loss_curves.png')
+        plt.savefig('./output/loss_curves.png')
         plt.close()
         
         # Check that plotting functions were called
@@ -136,7 +136,7 @@ class TestModelSaving(unittest.TestCase):
         mock_ylabel.assert_called_once()
         mock_legend.assert_called_once()
         mock_title.assert_called_once()
-        mock_savefig.assert_called_once()
+        mock_savefig.assert_called_once_with('./output/loss_curves.png')
         mock_close.assert_called_once()
         
     @patch('train.QuantumGenerator.save_weights')
@@ -147,12 +147,12 @@ class TestModelSaving(unittest.TestCase):
         discriminator = tf.keras.models.Sequential()
         
         # Save the models
-        generator.save_weights('/app/output/quantum_generator_weights.h5')
-        discriminator.save_weights('/app/output/discriminator_weights.h5')
+        generator.save_weights('./output/quantum_generator.weights.h5')
+        discriminator.save_weights('./output/discriminator.weights.h5')
         
         # Check that save_weights was called for both models
-        mock_generator_save.assert_called_once()
-        mock_discriminator_save.assert_called_once()
+        mock_generator_save.assert_called_once_with('./output/quantum_generator.weights.h5')
+        mock_discriminator_save.assert_called_once_with('./output/discriminator.weights.h5')
 
 
 if __name__ == '__main__':
