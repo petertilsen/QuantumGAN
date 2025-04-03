@@ -98,7 +98,7 @@ for epoch in range(epochs):
         plt.scatter(generated_samples[:, 0], generated_samples[:, 1], c='red', alpha=0.5, label='Generated Data')
         plt.legend()
         plt.title(f"Generated vs Real Data - Epoch {epoch+1}")
-        plt.savefig(f"/app/output/samples_epoch_{epoch+1}.png")
+        plt.savefig(f"./output/samples_epoch_{epoch+1}.png")
         plt.close()
 
 # Plot the loss curves
